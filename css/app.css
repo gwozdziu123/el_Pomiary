@@ -1,0 +1,101 @@
+/* el_Pomiary – rozszerzenia systemu wizualnego (na tokenach z tokens.css) */
+body { min-height: 100vh; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 88px); }
+svg { flex: none; width: 24px; height: 24px; }
+.banner svg { width: 22px; height: 22px; color: var(--warn); }
+.btn-add svg, .btn svg { width: 20px; height: 20px; }
+.menu-list button svg { width: 24px; height: 24px; }
+
+/* pasek górny: podtytuł i wskaźnik zapisu */
+.topbar h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.topbar h1 { line-height: 1.2; }
+.saved { font-size: 13px; color: var(--muted); opacity: 0; transition: opacity .2s; padding: 0 4px; }
+.saved.on { opacity: 1; }
+
+/* arkusz – wiele instancji (klasa zamiast #sheet-root) */
+.sheet-root { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+.sheet-root .backdrop { position: absolute; inset: 0; background: var(--backdrop); opacity: 0; transition: opacity .2s; }
+.sheet-root .sheet { position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: var(--content-max); max-height: 92%;
+  background: var(--card); border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform .22s ease-out; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-root.open { pointer-events: auto; }
+.sheet-root.open .backdrop { opacity: 1; }
+.sheet-root.open .sheet { transform: none; }
+.sheet-foot .btn { padding: 0 14px; }
+.sheet-foot .btn.icon-only { width: 50px; padding: 0; flex: none; }
+
+/* toast */
+#toast { display: inline-flex; gap: 8px; align-items: center; justify-content: center; }
+
+/* wyniki */
+.pill.na { background: var(--bg); color: var(--muted); }
+.pill.warn { background: var(--warn-weak); color: var(--warn); }
+.pill.info { background: var(--primary-weak); color: var(--primary); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.s-neg { --sc: var(--danger); }
+.s-new { --sc: var(--s-wycena); }
+.neg-txt { color: var(--danger); font-weight: 600; }
+
+/* karty sekcji i grup */
+.sec-head h3 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-head .tgl { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; min-height: 40px; }
+.sec-head .tgl svg { width: 18px; height: 18px; color: var(--muted); transition: transform .15s; }
+.sec-head .tgl.closed svg { transform: rotate(-90deg); }
+.sec-head .cnt { color: var(--muted); font-weight: 500; font-size: 14px; }
+.sec-head .icon-btn svg { width: 22px; height: 22px; }
+.row .lp { min-width: 34px; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.row > svg { width: 20px; height: 20px; color: var(--muted); }
+.row:last-child { border-bottom: 0; }
+.card > .row:last-child, .card > a.row:last-child { border-bottom: 0; }
+.wrap > .sec-title:first-child { margin-top: 8px; }
+.export-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 12px; }
+.ctx { margin: 0 4px 12px; }
+
+/* formularz w arkuszu pomiaru */
+.segp.iso button.on[data-v="OK"] { background: var(--s-zakonczony); border-color: var(--s-zakonczony); color: var(--on-status); }
+.segp.iso button.on[data-v="NOK"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.segp.fit { grid-auto-columns: minmax(64px, max-content); justify-content: start; }
+.mrow { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px 12px; margin: 0 0 10px; }
+.mrow.neg { border-color: var(--danger); }
+.mrow .mh { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mrow .mh b { min-width: 48px; }
+.mrow .mh .calc { flex: 1; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.three .field { margin: 0; }
+.three .inp { padding: 0 10px; }
+.mrow .isorow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.mrow .isorow .flabel { margin: 0; }
+.mrow .isorow .segp { min-width: 140px; }
+.mrow .isovals { margin-top: 10px; width: 100%; }
+.field-row { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.field-row .grow { flex: 1; }
+.cert { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 12px 4px; margin: 0 0 10px; }
+.cert .field { margin-bottom: 10px; }
+.btn.sm { height: 40px; padding: 0 12px; font-size: 15px; }
+
+/* ustawienia – tabele edycyjne */
+.set-table { width: 100%; border-collapse: collapse; }
+.set-table th { font-size: 13px; color: var(--muted); text-align: left; font-weight: 600; padding: 0 4px 6px; }
+.set-table td { padding: 3px; }
+.set-table .inp { height: 44px; padding: 0 10px; font-size: 16px; }
+.set-table td.act { width: 44px; }
+.set-table .icon-btn { color: var(--danger); }
+details.card .fx .two { margin-top: 4px; }
+details.card .body { padding: 0 16px 16px; }
+
+/* protokół – podgląd tabeli */
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.proto { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.proto th, table.proto td { border: 1px solid var(--line); padding: 6px 7px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.proto th { background: var(--bg); color: var(--muted); font-weight: 700; }
+table.proto tr.units td { font-size: 12px; color: var(--muted); }
+table.proto tr.g td { background: var(--primary-weak); font-weight: 700; text-align: left; }
+table.proto tr.sb td { background: var(--bg); font-weight: 600; text-align: left; }
+table.proto td.l { text-align: left; }
+table.proto td.neg { color: var(--danger); font-weight: 700; }
+table.proto tr[data-act]:active td { background: var(--line); }
+
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.foot-note { text-align: center; color: var(--muted); font-size: 13px; margin: 18px 0 0; }
+.hidden { display: none !important; }
+.set-table select.inp { min-width: 68px; padding: 0 22px 0 10px; background-position: calc(100% - 14px) 19px, calc(100% - 8px) 19px; }
