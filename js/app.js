@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.EP;
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.3.1';
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1012,16 +1012,17 @@
     const ex = src ? clone(src) : { id: E.uid(), name: '', certs: [{ cat: 'E', group: 'G1', nr: '' }] };
     ex.certs = ex.certs || [];
     const sh = openSheet({ title: id ? 'Wykonawca' : 'Nowy wykonawca' });
+    const isG1 = c => !c.group || c.group === 'G1';
     function draw() {
+      const shown = ex.certs.map((c, i) => ({ c: c, i: i })).filter(x => isG1(x.c));
       sh.body.innerHTML = '<div class="field"><label for="e-name">Imię i nazwisko</label><input class="inp" id="e-name" data-k="name" autocomplete="off" value="' + esc(ex.name) + '" placeholder="np. Jan Kowalski"></div>' +
-        '<div class="field-row"><span class="flabel grow" style="margin:0">Uprawnienia SEP</span><button type="button" class="btn-add" data-act="cadd">' + ic('plus') + 'Dodaj</button></div>' +
-        (ex.certs.length ? '' : '<div class="hint" style="margin:-6px 0 14px">Brak uprawnień – w protokole pojawi się tylko imię i nazwisko.</div>') +
-        ex.certs.map((c, i) => '<div class="cert" data-c="' + i + '"><div class="two">' +
-          '<div class="field"><label>Rodzaj</label><select class="inp" data-ck="cat">' + ['E', 'D'].map(v => '<option value="' + v + '"' + (c.cat === v ? ' selected' : '') + '>' + v + ' – ' + (v === 'E' ? 'eksploatacja' : 'dozór') + '</option>').join('') + '</select></div>' +
-          '<div class="field"><label>Grupa</label><select class="inp" data-ck="group">' + ['G1', 'G2', 'G3'].map(v => '<option' + (c.group === v ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></div></div>' +
-          '<div class="field"><label>Nr świadectwa</label><input class="inp" data-ck="nr" autocomplete="off" value="' + esc(c.nr) + '"></div>' +
-          '<div class="field-row" style="margin-bottom:8px"><span class="hint grow" style="margin:0" data-prev>' + esc(E.sepText({ certs: [c] })) + '</span><button type="button" class="btn danger-ghost sm" data-act="cdel">' + ic('trash') + 'Usuń</button></div></div>').join('') +
-        '<div class="hint">W protokole pod nazwiskiem pojawi się np. „SEP E G1 nr 123/45/24”.</div>';
+        '<div class="field-row"><span class="flabel grow" style="margin:0">Uprawnienia SEP – grupa G1</span><button type="button" class="btn-add" data-act="cadd">' + ic('plus') + 'Dodaj</button></div>' +
+        (shown.length ? '' : '<div class="hint" style="margin:-6px 0 14px">Brak uprawnień – w protokole pojawi się tylko imię i nazwisko.</div>') +
+        shown.map(x => { const c = x.c; return '<div class="cert" data-c="' + x.i + '"><div class="two">' +
+          '<div class="field"><label>Rodzaj</label><select class="inp" data-ck="cat">' + ['E', 'D'].map(v => '<option value="' + v + '"' + (c.cat === v ? ' selected' : '') + '>' + (v === 'E' ? 'E – eksploat.' : 'D – dozór') + '</option>').join('') + '</select></div>' +
+          '<div class="field"><label>Nr świadectwa</label><input class="inp" data-ck="nr" autocomplete="off" value="' + esc(c.nr) + '"></div></div>' +
+          '<div class="field-row" style="margin-bottom:8px"><span class="hint grow" style="margin:0" data-prev>' + esc(E.sepText({ certs: [c] })) + '</span><button type="button" class="btn danger-ghost sm" data-act="cdel">' + ic('trash') + 'Usuń</button></div></div>'; }).join('') +
+        '<div class="hint">Do pomiarów wymagane są uprawnienia grupy G1. W protokole pod nazwiskiem pojawi się np. „SEP E G1 nr 123/45/24”.</div>';
     }
     draw();
     sh.foot.innerHTML = (id ? '<button class="btn danger-ghost icon-only" data-a="del" aria-label="Usuń wykonawcę">' + ic('trash') + '</button>' : '') + '<button class="btn ghost" data-a="cancel">Anuluj</button><button class="btn primary" data-a="save">Zapisz</button>';

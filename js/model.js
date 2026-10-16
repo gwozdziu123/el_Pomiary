@@ -212,8 +212,9 @@
   /* ---------- wykonawcy / SEP ---------- */
   function sepText(ex) {
     const certs = (ex && ex.certs) || [];
-    return certs.filter(c => c.group || c.cat || c.nr).map(c => {
-      let s = 'SEP ' + [c.cat, c.group].filter(Boolean).join(' ');
+    /* do pomiarów wymagana jest grupa G1 – pozostałe grupy nie są drukowane */
+    return certs.filter(c => (!c.group || c.group === 'G1') && (c.cat || c.nr)).map(c => {
+      let s = 'SEP ' + [c.cat, 'G1'].filter(Boolean).join(' ');
       if (c.nr) s += ' nr ' + c.nr;
       return s.trim();
     }).join('; ');
