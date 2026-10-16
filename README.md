@@ -8,6 +8,7 @@ Aplikacja PWA (działa offline) do tworzenia protokołów:
 
 Eksport: **PDF** (A4) oraz **Excel .xlsx** (układ jak w szablonach, z formułami). Kopia zapasowa: **.json**.
 
+https://gwozdziu123.github.io/el_Pomiary/
 
 ## Dane i kopie zapasowe
 
