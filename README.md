@@ -8,26 +8,7 @@ Aplikacja PWA (działa offline) do tworzenia protokołów:
 
 Eksport: **PDF** (A4) oraz **Excel .xlsx** (układ jak w szablonach, z formułami). Kopia zapasowa: **.json**.
 
-## Uruchomienie na komputerze
-
-Otwórz `index.html` w Chrome lub Edge (dwuklik). Wszystko działa lokalnie, bez internetu.
-Dane zapisują się w przeglądarce na tym komputerze.
-
-## Instalacja na telefonie / tablecie
-
-Instalacja PWA wymaga, żeby aplikacja była dostępna pod adresem **https://**. Najprościej:
-
-**Netlify Drop (bez konta technicznego, ~1 min)**
-1. Wejdź na https://app.netlify.com/drop i przeciągnij cały folder `app`.
-2. Otrzymasz adres typu `https://nazwa.netlify.app` – otwórz go w Chrome na telefonie.
-3. Menu ⋮ → **Zainstaluj aplikację** / **Dodaj do ekranu głównego**.
-
-**GitHub Pages**
-1. Utwórz repozytorium, wgraj zawartość folderu `app`.
-2. Settings → Pages → Branch: `main`, folder `/root` → Save.
-3. Otwórz `https://<login>.github.io/<repo>/` na telefonie i zainstaluj jak wyżej.
-
-Po instalacji aplikacja działa w pełni offline (także eksport PDF/Excel).
+https://gwozdziu123.github.io/el_Pomiary/
 
 ## Dane i kopie zapasowe
 
