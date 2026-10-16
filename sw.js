@@ -1,5 +1,5 @@
 /* el_Pomiary – service worker (praca offline) */
-const VERSION = 'el-pomiary-v1.3.1';
+const VERSION = 'el-pomiary-v1.3.2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/tokens.css', './css/bundle.css', './css/app.css',
   './js/model.js', './js/db.js', './js/export.js', './js/app.js',

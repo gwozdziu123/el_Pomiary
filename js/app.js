@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.EP;
-  const APP_VERSION = '1.3.1';
+  const APP_VERSION = '1.3.2';
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -968,10 +968,10 @@
       '<div class="field"><label>Typ sieci</label><select class="inp" data-n="type">' + E.NETWORK_TYPES.map(t => '<option' + (t === n.type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div></div></div></details>';
 
     h += '<div class="sec-title">Kopia zapasowa</div><div class="card"><div class="kv"><span>Projekty na urządzeniu</span><b>' + projects.length + '</b></div>' +
-      '<div class="kv"><span>Trwały zapis danych</span><b>' + (persisted === null ? '—' : persisted ? 'tak' : 'nie') + '</b></div>' +
+      '<div class="kv"><span>Trwały zapis danych</span><b>' + (persisted === null ? '—' : persisted ? 'tak' : (S.installEvt ? '<button class="link-btn" data-act="install">nie (zainstaluj aplikację)</button>' : 'nie (zainstaluj aplikację)')) + '</b></div>' +
+      '<div class="kv"><span>Wersja aplikacji</span><b>' + APP_VERSION + '</b></div>' +
       '<div class="btns" style="padding-top:12px"><button class="btn primary block" data-act="backup">' + ic('download') + 'Zapisz kopię do pliku</button><button class="btn ghost block" data-act="import">' + ic('upload') + 'Wczytaj kopię z pliku</button>' +
       '<div class="hint" style="margin:0">Kopia zawiera wszystkie projekty i ustawienia – pozwala przenieść dane między telefonem a komputerem.</div></div></div>';
-    h += '<p class="foot-note">el_Pomiary ' + APP_VERSION + ' · dane przechowywane lokalnie na tym urządzeniu</p>';
     view().innerHTML = h;
 
     $$('details[data-open]').forEach(dt => dt.addEventListener('toggle', () => { OPEN[dt.dataset.open] = dt.open; }));
@@ -1003,6 +1003,12 @@
         exportJson({ app: 'el_Pomiary', version: 1, kind: 'backup', created: new Date().toISOString(), settings: s, projects: await DB.listProjects() }, 'el_Pomiary_kopia_' + E.today() + '.json');
       }
       if (a === 'import') importJson();
+      if (a === 'install' && S.installEvt) {
+        const ev = S.installEvt; S.installEvt = null;
+        ev.prompt();
+        try { await ev.userChoice; } catch (err) { }
+        await DB.persist(); viewSettings();
+      }
     };
   }
 
@@ -1082,7 +1088,7 @@
     window.scrollTo(0, y);
   }
   window.addEventListener('hashchange', () => { render().then(() => window.scrollTo(0, 0)); });
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (!location.hash || location.hash === '#/') render(); });
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (!location.hash || location.hash === '#/' || location.hash === '#/settings') render(); });
 
   async function start() {
     S.settings = await DB.loadSettings();
