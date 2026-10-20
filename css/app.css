@@ -100,3 +100,4 @@ table.proto tr[data-act]:active td { background: var(--line); }
 .hidden { display: none !important; }
 .set-table select.inp { min-width: 68px; padding: 0 22px 0 10px; background-position: calc(100% - 14px) 19px, calc(100% - 8px) 19px; }
 .link-btn { color: var(--primary); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+select.inp { padding-right: 40px; text-overflow: ellipsis; }

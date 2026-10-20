@@ -221,7 +221,7 @@
   }
 
   /* ---------- parametry sieci ---------- */
-  const DEFAULT_NETWORK = { Un: '230', Uo: '230', Ul: '50', ko: '1,0', ta: '0,20', type: 'TN-S' };
+  const DEFAULT_NETWORK = { Unom: '400/230', Un: '230', Uo: '230', Ul: '50', ko: '1,0', ta: '0,20', type: 'TN-S' };
   const NETWORK_TYPES = ['TN-S', 'TN-C', 'TN-C-S', 'TT', 'IT'];
   function networkLine(n) {
     n = Object.assign({}, DEFAULT_NETWORK, n || {});
@@ -268,7 +268,9 @@
       executors: [],
       breakers: defaultBreakers(),
       rcdTypes: defaultRcdTypes(),
-      network: Object.assign({}, DEFAULT_NETWORK)
+      network: Object.assign({}, DEFAULT_NETWORK),
+      company: '',
+      instruments: []
     };
   }
 
@@ -293,7 +295,8 @@
     const now = Date.now();
     return {
       id: uid(), name: '', location: '', date: today(),
-      executors: [],
+      client: '', inspection: 'powykonawcze',
+      executors: [], checkedBy: null, instruments: [], numbers: {},
       network: Object.assign({}, (settings && settings.network) || DEFAULT_NETWORK),
       docs: [], created: now, updated: now
     };

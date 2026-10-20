@@ -1,9 +1,9 @@
 /* el_Pomiary – service worker (praca offline) */
-const VERSION = 'el-pomiary-v1.3.2';
+const VERSION = 'el-pomiary-v1.4.3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/tokens.css', './css/bundle.css', './css/app.css',
-  './js/model.js', './js/db.js', './js/export.js', './js/app.js',
-  './lib/exceljs.min.js', './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './fonts/fonts.js',
+  './js/model.js', './js/db.js', './js/export.js', './js/reports.js', './js/app.js',
+  './lib/exceljs.min.js', './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/docx.min.js', './fonts/fonts.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'
 ];
 

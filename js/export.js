@@ -268,6 +268,8 @@
     doc.setFont('LS', 'normal'); doc.setFontSize(11);
     doc.text(type === 'rcd' ? 'Wykonawcy pomiarów:' : 'Wykonawca pomiarów:', M, y);
     doc.text('Data: ' + E.docDate(p.date), W - M, y, { align: 'right' });
+    const att = (p.numbers || {})[type];
+    if (att) { doc.setFontSize(8.5); doc.setTextColor(70); doc.text('Załącznik do protokołu nr ' + att, W - M, y + 4.5, { align: 'right' }); doc.setTextColor(0); doc.setFontSize(11); }
     y += 6;
     const exs = executorsOf(p);
     if (!exs.length) { y += 2; }
@@ -395,29 +397,183 @@
       doc.setTextColor(0);
     }
   }
-  function buildPdf(p, types) {
+  /* ---------- dokumenty tekstowe (protokoły, sprawozdanie) – PDF ---------- */
+  function wrapRuns(doc, runs, width, size) {
+    /* runs: [{text, bold}] -> linie [[{text,bold,x}]] */
+    const words = [];
+    runs.forEach(r => String(r.text || '').split(/(\s+)/).forEach(w => { if (w) words.push({ text: w, bold: !!r.bold }); }));
+    const lines = []; let line = [], x = 0;
+    words.forEach(w => {
+      doc.setFont('LS', w.bold ? 'bold' : 'normal'); doc.setFontSize(size);
+      const ww = doc.getTextWidth(w.text);
+      if (/^\s+$/.test(w.text)) { if (line.length) { line.push({ text: ' ', bold: w.bold, x: x }); x += doc.getTextWidth(' '); } return; }
+      if (x + ww > width && line.length) {
+        while (line.length && line[line.length - 1].text === ' ') line.pop();
+        lines.push(line); line = []; x = 0;
+      }
+      line.push({ text: w.text, bold: w.bold, x: x }); x += ww;
+    });
+    while (line.length && line[line.length - 1].text === ' ') line.pop();
+    if (line.length) lines.push(line);
+    return lines.length ? lines : [[]];
+  }
+  function renderBlocksPdf(doc, blocks) {
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    const L = 20, R = 20, CW = W - L - R;
+    let y = 18;
+    const need = h => { if (y + h > H - 22) { doc.addPage(); y = 20; } };
+    const runsAt = (runs, x, width, size, lh) => {
+      const lines = wrapRuns(doc, runs, width, size);
+      lines.forEach(ln => {
+        need(lh);
+        ln.forEach(seg => { doc.setFont('LS', seg.bold ? 'bold' : 'normal'); doc.setFontSize(size); doc.text(seg.text, x + seg.x, y); });
+        y += lh;
+      });
+    };
+    blocks.forEach(b => {
+      if (b.t === 'company') {
+        if (!b.lines.length) return;
+        b.lines.forEach((ln, i) => { doc.setFont('LS', i === 0 ? 'bold' : 'normal'); doc.setFontSize(i === 0 ? 10.5 : 9.5); doc.text(ln, L, y); y += 5; });
+        doc.setDrawColor(0); doc.setLineWidth(0.3); doc.line(L, y - 2, W - R, y - 2);
+        y += 9;
+      } else if (b.t === 'title' || b.t === 'title2') {
+        doc.setFont('LS', 'bold'); doc.setFontSize(b.t === 'title' ? 14 : 12.5);
+        doc.text(b.text, W / 2, y, { align: 'center' }); y += b.t === 'title' ? 7.5 : 6.5;
+      } else if (b.t === 'subtitle') {
+        y += 2;
+        doc.setFont('LS', 'bold'); doc.setFontSize(11.5);
+        const ls = doc.splitTextToSize(b.text, CW - 10);
+        ls.forEach(t => { doc.text(t, W / 2, y, { align: 'center' }); y += 6; });
+        y += 4;
+      } else if (b.t === 'items') {
+        y += 4;
+        b.items.forEach((it, i) => {
+          const num = (i + 1) + '.', ind = 8, size = 10, lh = 4.25;
+          need(lh);
+          doc.setFont('LS', 'normal'); doc.setFontSize(size); doc.text(num, L, y);
+          const runs = [{ text: it.label }];
+          if (it.value !== undefined) runs.push({ text: ' ' }, { text: it.value || '', bold: true });
+          runsAt(runs, L + ind, CW - ind, size, lh);
+          (it.paras || []).forEach(t => { y += 0.6; runsAt([{ text: t }], L + ind, CW - ind, size, lh); });
+          (it.sub || []).forEach(t => { y += 0.5; runsAt([{ text: t }], L + ind + 6, CW - ind - 6, size, lh); });
+          (it.after || []).forEach(t => { y += 0.6; runsAt([{ text: t }], L + ind, CW - ind, size, lh); });
+          y += 1.8;
+        });
+      } else if (b.t === 'para') {
+        y += 2; doc.setTextColor(b.small ? 80 : 0);
+        runsAt([{ text: b.text }], L, CW, b.small ? 9 : 10.5, 5); doc.setTextColor(0);
+      } else if (b.t === 'sign') {
+        const cw = CW / 3;
+        /* dokładna wysokość bloku podpisów */
+        let est = 0;
+        b.cols.forEach(c => {
+          doc.setFont('LS', 'normal'); doc.setFontSize(10);
+          let hh = 4.4 * (doc.splitTextToSize(c.label, cw - 6).length - 1) + 10 + 4.5;
+          (c.people || []).filter(Boolean).forEach(pp => { doc.setFontSize(8); hh += 4.4 + (pp.sep ? 3.8 * doc.splitTextToSize(pp.sep, cw - 8).length : 0) + 1.5; });
+          est = Math.max(est, hh);
+        });
+        need(est + 6); y += 6;
+        let maxY = y;
+        b.cols.forEach((c, i) => {
+          const x = L + i * cw;
+          let yy = y;
+          doc.setFont('LS', 'normal'); doc.setFontSize(10);
+          const lab = doc.splitTextToSize(c.label, cw - 6); doc.text(lab, x, yy); yy += 4.4 * (lab.length - 1) + 10;
+          doc.setLineDashPattern([0.6, 0.8], 0); doc.setLineWidth(0.2); doc.line(x, yy, x + cw - 8, yy); doc.setLineDashPattern([], 0);
+          yy += 4.5;
+          (c.people || []).filter(Boolean).forEach(pp => {
+            doc.setFont('LS', 'bold'); doc.setFontSize(9.5); doc.text(doc.splitTextToSize(pp.name, cw - 8), x, yy); yy += 4.4;
+            if (pp.sep) { doc.setFont('LS', 'normal'); doc.setFontSize(8); const ls = doc.splitTextToSize(pp.sep, cw - 8); doc.text(ls, x, yy); yy += 3.8 * ls.length; }
+            yy += 1.5;
+          });
+          maxY = Math.max(maxY, yy);
+        });
+        y = maxY + 4;
+      }
+    });
+  }
+
+  /* items: [{blocks:[...]}, 'loop' | 'iso' | 'rcd' (tabela)] */
+  function buildPdfDocs(p, items) {
     const doc = newPdf();
     const loop = E.getDoc(p, 'loop');
     let first = true;
-    types.forEach(t => {
-      const d = t === 'iso' ? loop : E.getDoc(p, t);
-      if (!d) return;
-      if (!first) doc.addPage();
-      first = false;
-      if (t === 'loop') pdfLoop(doc, p, d);
-      if (t === 'iso') pdfIso(doc, p, d);
-      if (t === 'rcd') pdfRcd(doc, p, d);
+    items.forEach(it => {
+      if (typeof it === 'string') {
+        const d = it === 'iso' ? loop : E.getDoc(p, it);
+        if (!d) return;
+        if (!first) doc.addPage();
+        first = false;
+        if (it === 'loop') pdfLoop(doc, p, d);
+        if (it === 'iso') pdfIso(doc, p, d);
+        if (it === 'rcd') pdfRcd(doc, p, d);
+      } else {
+        if (!first) doc.addPage();
+        first = false;
+        renderBlocksPdf(doc, it.blocks);
+      }
     });
     pdfFooters(doc, p);
     return Promise.resolve(doc.output('blob'));
   }
+  function buildPdf(p, types) { return buildPdfDocs(p, types); }
+
+  /* ---------- dokumenty tekstowe – Word (.docx) ---------- */
+  function buildDocx(p, blockDocs) {
+    const D = window.docx;
+    const FONT_D = 'Arial';
+    const run = (text, o) => new D.TextRun(Object.assign({ text: text, font: FONT_D, size: 20 }, o || {}));
+    const para = (children, o) => new D.Paragraph(Object.assign({ children: children, spacing: { after: 80 } }, o || {}));
+    const sections = blockDocs.map(blocks => {
+      const ch = [];
+      blocks.forEach(b => {
+        if (b.t === 'company') {
+          if (!b.lines.length) return;
+          b.lines.forEach((ln, i) => ch.push(para([run(ln, { bold: i === 0, size: i === 0 ? 22 : 20 })], { spacing: { after: 40 } })));
+          ch.push(new D.Paragraph({ border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: '000000', space: 1 } }, spacing: { after: 240 }, children: [] }));
+        } else if (b.t === 'title' || b.t === 'title2') {
+          ch.push(para([run(b.text, { bold: true, size: b.t === 'title' ? 28 : 25 })], { alignment: D.AlignmentType.CENTER, spacing: { after: 120 } }));
+        } else if (b.t === 'subtitle') {
+          ch.push(para([run(b.text, { bold: true, size: 23 })], { alignment: D.AlignmentType.CENTER, spacing: { before: 120, after: 240 } }));
+        } else if (b.t === 'items') {
+          b.items.forEach((it, i) => {
+            const rs = [run((i + 1) + '.\t'), run(it.label)];
+            if (it.value !== undefined) rs.push(run(' '), run(it.value || '', { bold: true }));
+            const ind = { left: 425, hanging: 425 };
+            ch.push(para(rs, { indent: ind, tabStops: [{ type: D.TabStopType.LEFT, position: 425 }], spacing: { before: 60, after: 40 } }));
+            (it.paras || []).forEach(t => ch.push(para([run(t)], { indent: { left: 425 }, spacing: { after: 40 } })));
+            (it.sub || []).forEach(t => ch.push(para([run(t)], { indent: { left: 850 }, spacing: { after: 20 } })));
+            (it.after || []).forEach(t => ch.push(para([run(t)], { indent: { left: 425 }, spacing: { before: 60, after: 60 } })));
+          });
+        } else if (b.t === 'para') {
+          ch.push(para([run(b.text, { size: b.small ? 18 : 21, color: b.small ? '505050' : '000000' })], { spacing: { before: 160 } }));
+        } else if (b.t === 'sign') {
+          const none = { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+          const cell = c => {
+            const kids = [para([run(c.label, { size: 20 })], { spacing: { after: 480 }, keepNext: true }),
+              para([run('..................................................', { size: 18, color: '808080' })], { spacing: { after: 60 } })];
+            (c.people || []).filter(Boolean).forEach(pp => {
+              kids.push(para([run(pp.name, { bold: true, size: 19 })], { spacing: { after: 0 } }));
+              if (pp.sep) kids.push(para([run(pp.sep, { size: 16 })], { spacing: { after: 60 } }));
+            });
+            return new D.TableCell({ children: kids, width: { size: 33, type: D.WidthType.PERCENTAGE }, borders: { top: none, bottom: none, left: none, right: none } });
+          };
+          ch.push(para([], { spacing: { before: 360 }, keepNext: true }));
+          ch.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, borders: D.TableBorders.NONE, rows: [new D.TableRow({ cantSplit: true, children: b.cols.map(cell) })] }));
+        }
+      });
+      return { properties: { page: { margin: { top: 1000, bottom: 1000, left: 1134, right: 1134 } } }, children: ch };
+    });
+    const d = new D.Document({ creator: 'el_Pomiary', styles: { default: { document: { run: { font: FONT_D, size: 21 } } } }, sections: sections });
+    return D.Packer.toBlob(d);
+  }
 
   /* ================= nazwy plików ================= */
   function fileName(p, types, ext) {
-    const base = types.length === 1 ? E.DOC_TYPES[types[0]].file : 'Protokol';
+    const base = types.length === 1 ? E.DOC_TYPES[types[0]].file : 'Tabele_pomiarow';
     const parts = [base, E.safeFile(p.location || p.name), (p.date || '').slice(0, 7)].filter(Boolean);
     return parts.join('_') + '.' + ext;
   }
 
-  window.EXPORT = { buildXlsx, buildPdf, fileName, LOOP_HEAD, ISO_HEAD, RCD_HEAD };
+  window.EXPORT = { buildXlsx, buildPdf, buildPdfDocs, buildDocx, fileName, LOOP_HEAD, ISO_HEAD, RCD_HEAD };
 })();

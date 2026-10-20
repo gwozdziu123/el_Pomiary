@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const E = window.EP;
-  const APP_VERSION = '1.3.2';
+  const APP_VERSION = '1.4.3';
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -174,6 +174,7 @@
   }
   function ensureLibs(kind) {
     if (kind === 'xlsx') return loadScript('lib/exceljs.min.js');
+    if (kind === 'docx') return loadScript('lib/docx.min.js');
     return loadScript('lib/jspdf.umd.min.js').then(() => loadScript('lib/jspdf.plugin.autotable.min.js')).then(() => loadScript('fonts/fonts.js'));
   }
   function docOrder(p) { return ['loop', 'iso', 'rcd'].filter(t => E.getDoc(p, t)); }
@@ -358,42 +359,70 @@
     return { s: st.total + ' pom.', r: st.total ? (st.neg ? 'Negatywna' : st.empty ? null : 'Pozytywna') : undefined };
   }
 
+  function refreshInstruments(p) {
+    (p.instruments || []).forEach((ins, i) => { const cur = S.settings.instruments.find(x => x.id === ins.id); if (cur) p.instruments[i] = clone(cur); });
+    if (p.checkedBy) { const cur = S.settings.executors.find(x => x.id === p.checkedBy.id); if (cur) p.checkedBy = clone(cur); }
+  }
+  function funcPills(i) {
+    return [['iso', 'izolacja'], ['loop', 'pętla'], ['rcd', 'RCD']].filter(f => i[f[0]]).map(f => '<span class="pill info">' + f[1] + '</span>').join(' ');
+  }
   function viewProject() {
     const p = S.project;
     p.network = Object.assign({}, E.DEFAULT_NETWORK, p.network || {});
-    refreshExecutors(p);
+    p.numbers = p.numbers || {}; p.instruments = p.instruments || [];
+    refreshExecutors(p); refreshInstruments(p);
     setTop(E.projectTitle(p), { back: '#/', sub: 'Protokół · ' + E.uiDate(p.date), menu: true });
     onTopMenu(() => projectMenu(p));
     const n = p.network;
     let h = '<div class="sec-title">Dane pomiarów</div><div class="card card-pad">' +
-      '<div class="field"><label for="f-loc">Miejsce przeprowadzenia pomiarów</label><textarea class="inp" id="f-loc" data-f="location" rows="2" placeholder="np. Pyskowice, Szkolna 2 – Szkoła Podstawowa nr 5">' + esc(p.location) + '</textarea></div>' +
+      '<div class="field"><label for="f-cli">Zleceniodawca</label><textarea class="inp" id="f-cli" data-f="client" rows="2" placeholder="Ulica, Miejscowość, Kod pocztowy - Nazwa zleceniodawcy">' + esc(p.client || '') + '</textarea></div>' +
+      '<div class="field"><label for="f-loc">Nazwa obiektu / miejsce pomiarów</label><textarea class="inp" id="f-loc" data-f="location" rows="2" placeholder="Ulica, Miejscowość, Kod pocztowy - Nazwa obiektu">' + esc(p.location) + '</textarea></div>' +
       '<div class="two"><div class="field"><label for="f-date">Data pomiarów</label><input class="inp" type="date" id="f-date" data-f="date" value="' + esc(p.date) + '"></div>' +
-      '<div class="field"><label for="f-name">Nazwa (opcjonalnie)</label><input class="inp" id="f-name" data-f="name" value="' + esc(p.name) + '" placeholder="np. Szkoła 2026"></div></div>' +
-      '<div class="hint" style="margin-top:-6px">W protokole data pojawi się jako ' + esc(E.docDate(p.date)) + '.</div></div>';
+      '<div class="field"><label for="f-name">Nazwa (opcjonalnie)</label><input class="inp" id="f-name" data-f="name" value="' + esc(p.name) + '" placeholder="Nazwa projektu"></div></div>' +
+      '<div class="field"><label>Rodzaj badania</label><div class="segp">' + [['powykonawcze', 'Powykonawcze'], ['okresowe', 'Okresowe']].map(o => '<button type="button" data-insp="' + o[0] + '" class="' + ((p.inspection || 'powykonawcze') === o[0] ? 'on' : '') + '">' + o[1] + '</button>').join('') + '</div></div>' +
+      '<div class="hint" style="margin-top:-6px">W tabelach data pojawi się jako ' + esc(E.docDate(p.date)) + ', w protokołach jako „' + esc(REPORTS.monthText(p.date)) + '”.</div></div>';
 
-    h += '<details class="card"><summary>Parametry sieci</summary><div class="body"><div class="hint" id="netline" style="margin:0 0 12px">' + esc(E.networkLine(n)) + '</div><div class="two">' +
+    h += '<details class="card"><summary>Parametry sieci</summary><div class="body"><div class="hint" id="netline" style="margin:0 0 12px">' + esc(E.networkLine(n)) + '</div>' +
+      '<div class="field"><label>Napięcie znamionowe instalacji</label><div class="suffix"><input class="inp" data-n="Unom" value="' + esc(n.Unom || '') + '" placeholder="400/230" autocomplete="off"><span>V</span></div></div><div class="two">' +
       ['Un', 'Uo', 'Ul'].map(k => '<div class="field"><label>' + k + '</label><div class="suffix">' + decInput('data-n="' + k + '"', n[k]) + '<span>V</span></div></div>').join('') +
       '<div class="field"><label>ko</label>' + decInput('data-n="ko"', n.ko) + '</div>' +
       '<div class="field"><label>ta</label><div class="suffix">' + decInput('data-n="ta"', n.ta) + '<span>s</span></div></div>' +
       '<div class="field"><label>Typ sieci</label><select class="inp" data-n="type">' + E.NETWORK_TYPES.map(t => '<option' + (t === n.type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>' +
       '</div></div></details>';
 
-    /* wykonawcy */
-    const sel = new Set((p.executors || []).map(x => x.id));
-    const all = S.settings.executors.slice();
-    (p.executors || []).forEach(x => { if (!all.find(a => a.id === x.id)) all.push(Object.assign({ _gone: true }, x)); });
-    h += '<div class="sec-title">Wykonawcy</div><div class="card">';
-    if (!all.length) h += '<div class="empty-sm" style="border-bottom:0">Brak wykonawców. <a href="#/settings" style="color:var(--primary);font-weight:600">Dodaj w Ustawieniach</a></div>';
-    all.forEach(ex => {
-      h += '<label class="check row" style="cursor:pointer"><input type="checkbox" data-ex="' + ex.id + '"' + (sel.has(ex.id) ? ' checked' : '') + '><div class="row-main"><div class="row-title">' + esc(ex.name) + (ex._gone ? ' <span class="pill warn">usunięty z ustawień</span>' : '') + '</div>' +
-        '<div class="row-sub" style="font-weight:400">' + (esc(E.sepText(ex)) || 'Brak uprawnień SEP') + '</div></div></label>';
+    /* wykonawcy: jedna osoba przeprowadza, jedna sprawdza */
+    const exOpt = x => esc(x.name) + (E.sepText(x) ? ' · ' + esc(E.sepText(x)) : ' · brak uprawnień SEP');
+    const personSelect = (id, attr, cur, emptyLabel) => {
+      const list = S.settings.executors.slice();
+      if (cur && !list.find(x => x.id === cur.id)) list.push(Object.assign({ _gone: true }, cur));
+      return '<select class="inp" id="' + id + '" ' + attr + '><option value="">' + emptyLabel + '</option>' +
+        list.map(x => '<option value="' + x.id + '"' + (cur && x.id === cur.id ? ' selected' : '') + '>' + exOpt(x) + (x._gone ? ' (usunięty z ustawień)' : '') + '</option>').join('') + '</select>';
+    };
+    if ((p.executors || []).length > 1) p.executors = p.executors.slice(0, 1);
+    const perf = (p.executors || [])[0] || null;
+    h += '<div class="sec-title">Wykonawcy</div><div class="card card-pad">';
+    if (!S.settings.executors.length && !perf && !p.checkedBy) h += '<div class="hint" style="margin:0 0 12px">Brak wykonawców. <a href="#/settings" style="color:var(--primary);font-weight:600">Dodaj w Ustawieniach</a></div>';
+    const sepHint = x => x ? (esc(E.sepText(x)) || 'Brak uprawnień SEP') : '';
+    h += '<div class="field"><label for="f-perf">Pomiary przeprowadził</label>' + personSelect('f-perf', 'data-perf="1"', perf, '— wybierz osobę —') + '<div class="hint" id="h-perf">' + sepHint(perf) + '</div></div>' +
+      '<div class="field" style="margin:0"><label for="f-chk">Protokół sprawdził</label>' + personSelect('f-chk', 'data-chk="1"', p.checkedBy, '— pole do podpisu —') + '<div class="hint" id="h-chk">' + sepHint(p.checkedBy) + '</div></div>';
+    h += '</div>';
+
+    /* przyrządy */
+    const isel = new Set(p.instruments.map(x => x.id));
+    const iall = S.settings.instruments.slice();
+    p.instruments.forEach(x => { if (!iall.find(a => a.id === x.id)) iall.push(Object.assign({ _gone: true }, x)); });
+    h += '<div class="sec-title">Przyrządy pomiarowe</div><div class="card">';
+    if (!iall.length) h += '<div class="empty-sm" style="border-bottom:0">Brak przyrządów. <a href="#/settings" style="color:var(--primary);font-weight:600">Dodaj w Ustawieniach</a></div>';
+    iall.forEach(i => {
+      h += '<label class="check row" style="cursor:pointer"><input type="checkbox" data-ins="' + i.id + '"' + (isel.has(i.id) ? ' checked' : '') + '><div class="row-main"><div class="row-title">' + esc(i.name) + (i._gone ? ' <span class="pill warn">usunięty z ustawień</span>' : '') + '</div>' +
+        '<div class="row-sub" style="font-weight:400">nr ' + esc(i.serial || '—') + ' · ' + funcPills(i) + '</div></div></label>';
     });
     h += '</div>';
 
-    /* dokumenty */
+    /* dokumenty pomiarowe */
     const order = docOrder(p);
     const missing = ['loop', 'iso', 'rcd'].filter(t => !E.getDoc(p, t));
-    h += '<div class="sec-title">Dokumenty</div><div class="card">';
+    h += '<div class="sec-title">Pomiary</div><div class="card">';
     if (missing.length) h += '<div class="sec-head"><h3>' + order.length + ' z 3</h3><button class="btn-add" data-act="adddoc">' + ic('plus') + 'Dodaj</button></div>';
     if (!order.length) h += '<div class="empty-sm" style="border-bottom:0">Dodaj dokumenty, które chcesz wykonać w tym projekcie.</div>';
     order.forEach(t => {
@@ -404,11 +433,31 @@
     });
     h += '</div>';
 
+    /* dokumenty do wydruku */
+    const ptypes = REPORTS.protocolTypes(p);
+    if (ptypes.length) {
+      const ov = REPORTS.overall(p);
+      h += '<div class="sec-title">Protokoły i sprawozdanie</div><div class="card">';
+      h += '<div class="row" style="cursor:default"><div class="row-main"><div class="row-title">Sprawozdanie z badania</div><div class="row-sub">' +
+        (ov === null ? 'Brak wyników' : ov ? 'Instalacja spełnia wymagania' : '<span class="neg-txt">Instalacja nie spełnia wymagań</span>') + '</div></div>' +
+        '<button class="btn ghost sm" data-rep="report" data-k="pdf">PDF</button><button class="btn ghost sm" data-rep="report" data-k="docx">Word</button></div>';
+      ptypes.forEach(t => {
+        const c = REPORTS.conclusion(p, t);
+        h += '<div class="row" style="cursor:default;flex-wrap:wrap"><div class="row-main"><div class="row-title">' + esc(REPORTS.PROTO[t].short) + '</div><div class="row-sub">' +
+          (c.ok === null ? 'Brak wyników' : c.ok ? 'Spełnia wymagania' : '<span class="neg-txt">Nie spełnia wymagań</span>') + '</div></div>' +
+          '<button class="btn ghost sm" data-rep="' + t + '" data-k="pdf">PDF</button><button class="btn ghost sm" data-rep="' + t + '" data-k="docx">Word</button>' +
+          '<div class="field" style="margin:8px 0 0;width:100%"><label>Numer protokołu</label><input class="inp" data-no="' + t + '" value="' + esc(p.numbers[t] || '') + '" placeholder="nadawany przy pierwszym generowaniu, np. 1/' + esc(REPORTS.monthKey(p.date)) + '" autocomplete="off"></div></div>';
+      });
+      h += '<div class="btns" style="padding-top:12px"><button class="btn ghost block" data-act="numbers">' + ic('edit') + (REPORTS.missingNumbers(p).length ? 'Nadaj numery protokołów' : 'Nadaj numery od nowa') + '</button>' +
+        '<div class="hint" style="margin:0">Numer N/MM.RRRR: kolejny wolny w miesiącu daty projektu, liczony po wszystkich projektach na tym urządzeniu. Możesz go zmienić ręcznie.</div></div></div>';
+    }
+
     /* eksport */
-    h += '<div class="sec-title">Protokół</div><div class="card"><div class="btns" style="padding-top:16px">' +
-      '<button class="btn primary block" data-act="pdf"' + (order.length ? '' : ' disabled style="opacity:.5"') + '>' + ic('file') + 'Zapisz protokół PDF</button>' +
-      '<button class="btn ghost block" data-act="xlsx"' + (order.length ? '' : ' disabled style="opacity:.5"') + '>' + ic('table') + 'Zapisz protokół Excel</button>' +
-      '<div class="hint" style="margin:0">Plik zawiera wszystkie dokumenty projektu – każdy na osobnej stronie lub w osobnym arkuszu.</div></div></div>';
+    h += '<div class="sec-title">Komplet</div><div class="card"><div class="btns" style="padding-top:16px">' +
+      '<button class="btn primary block" data-act="allpdf"' + (order.length ? '' : ' disabled style="opacity:.5"') + '>' + ic('file') + 'Zapisz komplet PDF</button>' +
+      '<button class="btn ghost block" data-act="alldocx"' + (ptypes.length ? '' : ' disabled style="opacity:.5"') + '>' + ic('file') + 'Zapisz komplet Word</button>' +
+      '<button class="btn ghost block" data-act="xlsx"' + (order.length ? '' : ' disabled style="opacity:.5"') + '>' + ic('table') + 'Zapisz tabele pomiarów Excel</button>' +
+      '<div class="hint" style="margin:0">PDF: sprawozdanie, a po nim każdy protokół z tabelą pomiarów. Word: sprawozdanie i protokoły (tabele pomiarów są w PDF i Excelu).</div></div></div>';
     view().innerHTML = h;
 
     view().oninput = e => {
@@ -419,30 +468,89 @@
         saveProject();
       }
       if (t.dataset.n && t.tagName === 'INPUT') {
-        validateDec(t); p.network[t.dataset.n] = t.value.trim();
+        if (t.dataset.n !== 'Unom') validateDec(t);
+        p.network[t.dataset.n] = t.value.trim();
         $('#netline').textContent = E.networkLine(p.network); saveProject();
+      }
+      if (t.dataset.no) {
+        p.numbers[t.dataset.no] = t.value.trim();
+        t.classList.toggle('err', !!t.value.trim() && !REPORTS.parseNo(t.value));
+        saveProject();
       }
     };
     view().onchange = e => {
       const t = e.target;
       if (t.dataset.f === 'date') { saveProject(); viewProject(); }
-      if (t.dataset.ex) {
-        const id = t.dataset.ex;
-        if (t.checked) { const ex = S.settings.executors.find(x => x.id === id); if (ex && !p.executors.find(x => x.id === id)) p.executors.push(clone(ex)); }
-        else p.executors = p.executors.filter(x => x.id !== id);
-        const ordered = S.settings.executors.map(x => p.executors.find(y => y.id === x.id)).filter(Boolean);
-        p.executors = ordered.concat(p.executors.filter(x => !ordered.includes(x)));
+      if (t.dataset.perf) {
+        const ex = S.settings.executors.find(x => x.id === t.value) || (p.executors || []).find(x => x.id === t.value);
+        p.executors = ex ? [clone(ex)] : []; saveProject();
+        $('#h-perf').textContent = ex ? (E.sepText(ex) || 'Brak uprawnień SEP') : '';
+      }
+      if (t.dataset.chk) {
+        const ex = S.settings.executors.find(x => x.id === t.value) || (p.checkedBy && p.checkedBy.id === t.value ? p.checkedBy : null);
+        p.checkedBy = ex ? clone(ex) : null; saveProject();
+        $('#h-chk').textContent = ex ? (E.sepText(ex) || 'Brak uprawnień SEP') : '';
+      }
+      if (t.dataset.ins) {
+        const id = t.dataset.ins;
+        if (t.checked) { const i = S.settings.instruments.find(x => x.id === id); if (i && !p.instruments.find(x => x.id === id)) p.instruments.push(clone(i)); }
+        else p.instruments = p.instruments.filter(x => x.id !== id);
+        const ordered = S.settings.instruments.map(x => p.instruments.find(y => y.id === x.id)).filter(Boolean);
+        p.instruments = ordered.concat(p.instruments.filter(x => !ordered.includes(x)));
         saveProject();
       }
       if (t.dataset.n && t.tagName === 'SELECT') { p.network.type = t.value; $('#netline').textContent = E.networkLine(p.network); saveProject(); }
     };
     view().onclick = async e => {
+      const ib = e.target.closest('[data-insp]');
+      if (ib) { p.inspection = ib.dataset.insp; $$('[data-insp]').forEach(x => x.classList.toggle('on', x === ib)); saveProject(); return; }
+      const rb = e.target.closest('[data-rep]');
+      if (rb) return doReport(rb.dataset.k, rb.dataset.rep);
       const b = e.target.closest('[data-act]'); if (!b) return;
       const a = b.dataset.act;
       if (a === 'adddoc') return chooseDoc(p);
-      if (a === 'pdf') doExport('pdf', docOrder(p));
+      if (a === 'allpdf') return doReport('pdf', 'all');
+      if (a === 'alldocx') return doReport('docx', 'all');
       if (a === 'xlsx') doExport('xlsx', docOrder(p));
+      if (a === 'numbers') {
+        if (!REPORTS.missingNumbers(p).length) {
+          if (!(await confirmDlg('Nadać numery protokołów od nowa?\nObecne numery tego projektu zostaną zastąpione kolejnymi wolnymi z miesiąca ' + esc(REPORTS.monthKey(p.date)) + '.', 'Nadaj'))) return;
+          p.numbers = {};
+        }
+        await flush();
+        REPORTS.assignNumbers(p, await DB.listProjects());
+        await saveProject(true); refresh(); toast('Nadano numery');
+      }
     };
+  }
+  /* generowanie protokołów / sprawozdania: what = 'all' | 'report' | 'iso' | 'loop' | 'rcd' */
+  async function doReport(kind, what) {
+    const p = S.project;
+    await flush();
+    const ptypes = REPORTS.protocolTypes(p);
+    const types = what === 'all' || what === 'report' ? ptypes : [what];
+    if (REPORTS.missingNumbers(p).length && REPORTS.assignNumbers(p, await DB.listProjects())) { await saveProject(true); refresh(); }
+    const iss = REPORTS.issues(p, types);
+    if (iss.length && !(await confirmDlg('Uwaga – w dokumencie są braki:\n• ' + iss.map(esc).join('\n• ') + '\n\nWygenerować mimo to?', 'Generuj'))) return;
+    const t = toast('<span class="spinner"></span>Tworzę plik…', 0);
+    try {
+      await ensureLibs(kind === 'docx' ? 'docx' : 'pdf');
+      const docs = [];
+      if (what === 'all' || what === 'report') docs.push(REPORTS.reportBlocks(p, S.settings));
+      if (what !== 'report') types.forEach(ty => docs.push(REPORTS.protocolBlocks(p, ty, S.settings)));
+      let blob;
+      if (kind === 'docx') blob = await EXPORT.buildDocx(p, docs);
+      else {
+        const items = [];
+        if (what === 'all' || what === 'report') items.push({ blocks: docs[0] });
+        if (what !== 'report') types.forEach((ty, i) => { items.push({ blocks: docs[(what === 'all' ? 1 : 0) + i] }); items.push(ty); });
+        blob = await EXPORT.buildPdfDocs(p, items);
+      }
+      t.remove();
+      fileReady(blob, REPORTS.fileBase(p, what) + '.' + kind);
+    } catch (err) {
+      console.error(err); toast('Nie udało się utworzyć pliku: ' + esc(err.message), 5000);
+    }
   }
   function chooseDoc(p) {
     const missing = ['loop', 'iso', 'rcd'].filter(t => !E.getDoc(p, t));
@@ -472,6 +580,7 @@
       const c = clone(p);
       c.id = E.uid(); c.created = c.updated = Date.now();
       c.name = E.projectTitle(p) + ' (kopia)';
+      c.numbers = {};
       if (v === 'dupclean') {
         c.date = E.today();
         (E.getDoc(c, 'loop') || { groups: [] }).groups.forEach(g => g.measurements.forEach(m => m.rows.forEach(r => { r.Ik = r.Zs = r.U = ''; r.iso = 'OK'; r.isoVals = {}; })));
@@ -885,7 +994,7 @@
       return '<div class="res-head" style="padding:12px 14px 2px">Ocena</div><div class="res-big ' + cls + '" style="padding:2px 14px 4px"><b>' + (c.result || '—') + '</b></div><div class="hint" style="padding:0 14px 12px;margin:0">Wymagane: ' + crit + '</div>';
     }
     sh.body.innerHTML =
-      '<div class="field"><label for="r-name">Nazwa punktu / obwodu</label><input class="inp" id="r-name" data-k="name" enterkeyhint="next" autocomplete="off" value="' + esc(r.name) + '" placeholder="np. Gniazda zewnętrzne"></div>' +
+      '<div class="field"><label for="r-name">Nazwa punktu / obwodu</label><input class="inp" id="r-name" data-k="name" enterkeyhint="next" autocomplete="off" value="' + esc(r.name) + '"></div>' +
       '<div class="field"><label for="r-type">Typ zabezpieczenia</label><select class="inp" id="r-type" data-k="type">' + typeOpts() + '</select></div>' +
       '<div class="two"><div class="field"><label>Czas wyzwolenia</label><div class="suffix">' + decInput('data-k="t"', r.t) + '<span>ms</span></div></div>' +
       '<div class="field"><label>Prąd wyzwolenia</label><div class="suffix">' + decInput('data-k="I"', r.I) + '<span>mA</span></div></div></div>' +
@@ -938,13 +1047,26 @@
     const projects = await DB.listProjects();
     let persisted = null;
     try { if (navigator.storage && navigator.storage.persisted) persisted = await navigator.storage.persisted(); } catch (e) { }
-    let h = '<div class="sec-title">Wykonawcy</div><div class="card"><div class="sec-head"><h3>Osoby wykonujące pomiary</h3><button class="btn-add" data-act="exadd">' + ic('plus') + 'Dodaj</button></div>';
+    s.instruments = s.instruments || [];
+    let h = '<div class="sec-title">Dane firmy</div><div class="card card-pad"><div class="field" style="margin:0"><label for="s-co">Nagłówek protokołów i sprawozdań</label>' +
+      '<textarea class="inp" id="s-co" data-co="1" rows="3" placeholder="Nazwa firmy&#10;Ulica, Miejscowość, Kod pocztowy - Imię i nazwisko">' + esc(s.company || '') + '</textarea>' +
+      '<div class="hint">Pierwsza linia drukowana pogrubioną czcionką, kolejne pod nią.</div></div></div>';
+    h += '<div class="sec-title">Wykonawcy</div><div class="card"><div class="sec-head"><h3>Osoby wykonujące pomiary</h3><button class="btn-add" data-act="exadd">' + ic('plus') + 'Dodaj</button></div>';
     if (!s.executors.length) h += '<div class="empty-sm" style="border-bottom:0">Dodaj siebie i współpracowników z uprawnieniami SEP.</div>';
     s.executors.forEach(ex => {
       h += '<button class="row" data-act="exedit" data-id="' + ex.id + '"><div class="row-main"><div class="row-title">' + esc(ex.name) + '</div><div class="row-sub">' + (esc(E.sepText(ex)) || 'Brak uprawnień SEP') + '</div></div>' + ic('chev') + '</button>';
     });
     h += '</div>';
 
+    h += '<div class="sec-title">Przyrządy pomiarowe</div><div class="card"><div class="sec-head"><h3>Mierniki</h3><button class="btn-add" data-act="iadd">' + ic('plus') + 'Dodaj</button></div><div class="card-pad">';
+    if (!s.instruments.length) h += '<div class="hint" style="margin:0">Dodaj mierniki – w projekcie wybierzesz, którymi wykonano pomiary.</div>';
+    s.instruments.forEach(i => {
+      h += '<div class="cert" data-i="' + i.id + '"><div class="two"><div class="field"><label>Nazwa / typ</label><input class="inp" data-ik="name" value="' + esc(i.name) + '" placeholder="Producent Model" autocomplete="off"></div>' +
+        '<div class="field"><label>Nr seryjny</label><input class="inp" data-ik="serial" value="' + esc(i.serial) + '" placeholder="Numer seryjny" autocomplete="off"></div></div>' +
+        '<div class="field-row" style="margin-bottom:8px;flex-wrap:wrap">' + [['iso', 'Izolacja'], ['loop', 'Pętla zwarcia'], ['rcd', 'RCD']].map(f => '<label class="check" style="min-height:40px;gap:8px"><input type="checkbox" data-if="' + f[0] + '"' + (i[f[0]] ? ' checked' : '') + '>' + f[1] + '</label>').join('') +
+        '<span class="grow"></span><button type="button" class="icon-btn" style="color:var(--danger)" data-act="idel" aria-label="Usuń przyrząd">' + ic('trash') + '</button></div></div>';
+    });
+    h += '</div></div>';
     h += '<div class="sec-title">Zabezpieczenia</div>';
     h += '<details class="card" data-open="br"' + (OPEN.br ? ' open' : '') + '><summary>Wyłączniki – pętla zwarcia (' + s.breakers.length + ')</summary><div class="body">' +
       '<div class="hint" style="margin:0 0 10px">In i k są kopiowane do pomiaru – zmiana listy nie zmienia zapisanych pomiarów. In możesz zmienić w pojedynczym pomiarze.</div>' +
@@ -982,16 +1104,27 @@
       if (br) { s.breakers.find(x => x.id === br.dataset.b)[t.dataset.k] = t.value; saveSettings(); }
       if (rt && t.tagName === 'INPUT') { s.rcdTypes.find(y => y.id === rt.dataset.rt)[t.dataset.k] = t.value; saveSettings(); }
       if (t.dataset.n && t.tagName === 'INPUT') { s.network[t.dataset.n] = t.value.trim(); saveSettings(); }
+      if (t.dataset.co) { s.company = t.value; saveSettings(); }
+      const ib = t.closest('[data-i]');
+      if (ib && t.dataset.ik) { s.instruments.find(x => x.id === ib.dataset.i)[t.dataset.ik] = t.value; saveSettings(); }
     };
     view().onchange = e => {
       const t = e.target, rt = t.closest('[data-rt]');
       if (rt && t.tagName === 'SELECT') { s.rcdTypes.find(y => y.id === rt.dataset.rt).cls = t.value; saveSettings(); }
       if (t.dataset.n && t.tagName === 'SELECT') { s.network.type = t.value; saveSettings(); }
+      const ib = t.closest('[data-i]');
+      if (ib && t.dataset.if) { s.instruments.find(x => x.id === ib.dataset.i)[t.dataset.if] = t.checked; saveSettings(); }
     };
     view().onclick = async e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       const a = b.dataset.act;
       if (a === 'exadd') return openExecutor(null);
+      if (a === 'iadd') { s.instruments.push({ id: E.uid(), name: '', serial: '', iso: true, loop: true, rcd: true }); await saveSettings(true); await viewSettings(); const ins = $$('[data-i] [data-ik=name]'); ins[ins.length - 1].focus(); return; }
+      if (a === 'idel') {
+        const id = b.closest('[data-i]').dataset.i, it = s.instruments.find(x => x.id === id);
+        if (!(await confirmDlg('Usunąć przyrząd „' + esc(it.name || 'bez nazwy') + '”?\nIstniejące projekty zachowają jego dane.', 'Usuń', true))) return;
+        s.instruments = s.instruments.filter(x => x.id !== id); await saveSettings(true); return viewSettings();
+      }
       if (a === 'exedit') return openExecutor(b.dataset.id);
       if (a === 'badd') { s.breakers.push({ id: E.uid(), name: '', In: '', k: '5' }); await saveSettings(true); await viewSettings(); const ins = $$('[data-b] input[data-k=name]'); ins[ins.length - 1].focus(); return; }
       if (a === 'bdel') { s.breakers = s.breakers.filter(x => x.id !== b.closest('[data-b]').dataset.b); await saveSettings(true); return viewSettings(); }
@@ -1021,14 +1154,14 @@
     const isG1 = c => !c.group || c.group === 'G1';
     function draw() {
       const shown = ex.certs.map((c, i) => ({ c: c, i: i })).filter(x => isG1(x.c));
-      sh.body.innerHTML = '<div class="field"><label for="e-name">Imię i nazwisko</label><input class="inp" id="e-name" data-k="name" autocomplete="off" value="' + esc(ex.name) + '" placeholder="np. Jan Kowalski"></div>' +
+      sh.body.innerHTML = '<div class="field"><label for="e-name">Imię i nazwisko</label><input class="inp" id="e-name" data-k="name" autocomplete="off" value="' + esc(ex.name) + '" placeholder="Imię i nazwisko"></div>' +
         '<div class="field-row"><span class="flabel grow" style="margin:0">Uprawnienia SEP – grupa G1</span><button type="button" class="btn-add" data-act="cadd">' + ic('plus') + 'Dodaj</button></div>' +
         (shown.length ? '' : '<div class="hint" style="margin:-6px 0 14px">Brak uprawnień – w protokole pojawi się tylko imię i nazwisko.</div>') +
         shown.map(x => { const c = x.c; return '<div class="cert" data-c="' + x.i + '"><div class="two">' +
           '<div class="field"><label>Rodzaj</label><select class="inp" data-ck="cat">' + ['E', 'D'].map(v => '<option value="' + v + '"' + (c.cat === v ? ' selected' : '') + '>' + (v === 'E' ? 'E – eksploat.' : 'D – dozór') + '</option>').join('') + '</select></div>' +
-          '<div class="field"><label>Nr świadectwa</label><input class="inp" data-ck="nr" autocomplete="off" value="' + esc(c.nr) + '"></div></div>' +
+          '<div class="field"><label>Nr świadectwa</label><input class="inp" data-ck="nr" autocomplete="off" value="' + esc(c.nr) + '" placeholder="Numer świadectwa"></div></div>' +
           '<div class="field-row" style="margin-bottom:8px"><span class="hint grow" style="margin:0" data-prev>' + esc(E.sepText({ certs: [c] })) + '</span><button type="button" class="btn danger-ghost sm" data-act="cdel">' + ic('trash') + 'Usuń</button></div></div>'; }).join('') +
-        '<div class="hint">Do pomiarów wymagane są uprawnienia grupy G1. W protokole pod nazwiskiem pojawi się np. „SEP E G1 nr 123/45/24”.</div>';
+        '<div class="hint">Do pomiarów wymagane są uprawnienia grupy G1. W protokole pod nazwiskiem pojawi się np. „SEP E G1 nr Numer świadectwa”.</div>';
     }
     draw();
     sh.foot.innerHTML = (id ? '<button class="btn danger-ghost icon-only" data-a="del" aria-label="Usuń wykonawcę">' + ic('trash') + '</button>' : '') + '<button class="btn ghost" data-a="cancel">Anuluj</button><button class="btn primary" data-a="save">Zapisz</button>';

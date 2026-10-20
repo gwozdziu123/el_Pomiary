@@ -75,7 +75,12 @@
       return DB.get('settings').then(s => {
         const def = EP.defaultSettings();
         if (!s) return def;
-        return Object.assign(def, s, { network: Object.assign({}, def.network, s.network || {}) });
+        const out = Object.assign(def, s, { network: Object.assign({}, def.network, s.network || {}) });
+        /* jednorazowe usunięcie danych przykładowych z wersji 1.4.0–1.4.1 (porównanie skrótów, bez danych w kodzie) */
+        const hs = t => { let x = 5381; for (const c of String(t)) x = ((x * 33) ^ c.codePointAt(0)) >>> 0; return x.toString(36); };
+        if (hs(out.company || '') === 'x7blpj') out.company = '';
+        out.instruments = (out.instruments || []).filter(i => ['3x3ey7', '1kgm9r4'].indexOf(hs((i.name || '') + '|' + (i.serial || ''))) < 0);
+        return out;
       });
     },
     saveSettings(s) { return DB.set('settings', s); },
